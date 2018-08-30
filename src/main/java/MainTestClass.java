@@ -3,14 +3,33 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 
+
 public class MainTestClass {
 
-    public static void start(Class c){
+    private static Object ob;
+    private static  Method[] methods;
+    private static  ArrayList<String> tests = new ArrayList<String>(  );
+    private static int counterOfAnnoBS = 0;
+    private static int counterOfAnnoAS = 0;
+    private static String before = "";
+    private static String after = "";
 
-        Method[] methods = c.getDeclaredMethods();
-        int counterOfAnnoBS = 0;
-        int counterOfAnnoAS = 0;
-        Object ob = null;
+    public static void start(Class c){
+        ob = null;
+        methods = c.getDeclaredMethods();
+
+        createInstance( c );
+        findTestMethods();
+
+        if (counterOfAnnoAS > 1 || counterOfAnnoBS > 1)
+            throw new RuntimeException( "Более одной аннотации BeforeSuite или AfterSuite" );
+
+        startBeforeSuite( c );
+        startTests( c );
+        startAfterSuite( c );
+    }
+
+    private static void createInstance(Class c){
         try {
             Constructor constructor = c.getConstructor(  );
             try {
@@ -25,16 +44,15 @@ public class MainTestClass {
         } catch (NoSuchMethodException e) {
             e.printStackTrace();
         }
+    }
 
-        String before = "";
-        String after = "";
-        ArrayList<String> tests = new ArrayList<String>(  );
+    private static void findTestMethods (){
 
         for (Method o : methods ) {
             if (o.isAnnotationPresent( BeforeSuite.class )) {
                 counterOfAnnoBS++;
                 before = o.getName();
-             }
+            }
             if (o.isAnnotationPresent( AfterSuite.class )) {
                 counterOfAnnoAS++;
                 after = o.getName();
@@ -43,11 +61,8 @@ public class MainTestClass {
                 tests.add( o.getName() );
             }
         }
-
-        if (counterOfAnnoAS > 1 || counterOfAnnoBS > 1)
-            throw new RuntimeException( "Более одной аннотации BeforeSuite или AfterSuite" );
-
-
+    }
+    private static void startBeforeSuite(Class c){
         Method BeforeSuite = null;
         try {
             BeforeSuite = c.getMethod( before );
@@ -59,23 +74,26 @@ public class MainTestClass {
         } catch (InvocationTargetException e) {
             e.printStackTrace();
         }
-
+    }
+    private static void startTests(Class c){
         Method Tests = null;
-        for (String t: tests) {
-            try {
-
-                Tests = TestClass.class.getDeclaredMethod( t );
-                Tests.setAccessible( true );
-                Tests.invoke( ob );
-            } catch (NoSuchMethodException e) {
-                e.printStackTrace();
-            } catch (IllegalAccessException e) {
-                e.printStackTrace();
-            } catch (InvocationTargetException e) {
-                e.printStackTrace();
+        try {
+            for (int i = 0; i < 10; i++) {
+                for (String t : tests) {
+                    Tests = c.getMethod( t );
+                    Test test = Tests.getAnnotation(Test.class);
+                    if(test.priority()==i) Tests.invoke( ob );
+                }
             }
+        } catch (NoSuchMethodException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
         }
-
+    }
+    private static void startAfterSuite(Class c){
         Method AfterSuite = null;
         try {
             AfterSuite = c.getMethod( after );
@@ -87,8 +105,5 @@ public class MainTestClass {
         } catch (InvocationTargetException e) {
             e.printStackTrace();
         }
-
     }
-
-
 }
